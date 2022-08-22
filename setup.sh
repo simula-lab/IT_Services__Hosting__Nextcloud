@@ -3,8 +3,8 @@
 DOMAIN=$1
 EMAIL=$2
 
-MYSQL_PASSWORD=????
-MYSQL_ROOT_PASSWORD=????
+MYSQL_PASSWORD=${openssl rand 30 | base64 -w 0}
+MYSQL_ROOT_PASSWORD=${openssl rand 30 | base64 -w 0}
 
 echo DOMAIN=${DOMAIN} > .env
 echo EMAIL=${EMAIL} >> .env
