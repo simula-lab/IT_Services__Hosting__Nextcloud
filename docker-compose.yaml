@@ -1,0 +1,90 @@
+---
+version: "3"
+services:
+    proxy:
+        container_name: proxy
+        build: ./proxy
+        restart: always
+        ports:
+            - 80:80
+            - 443:443
+        labels:
+            com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy: "true"
+        volumes:
+            - certs:/etc/nginx/certs:ro
+            - vhost.d:/etc/nginx/vhost.d
+            - html:/usr/share/nginx/html
+            - /var/run/docker.sock:/tmp/docker.sock:ro
+        networks:
+            - proxy-tier
+    app:
+        container_name: app
+        image: nextcloud:apache
+        restart: always
+        volumes:
+            - nextcloud:/var/www/html
+        environment:
+            - OVERWRITEPROTOCOL=https
+            - VIRTUAL_HOST="${DOMAIN}"
+            - LETSENCRYPT_HOST="${DOMAIN}"
+            - LETSENCRYPT_EMAIL="${EMAIL}"
+            - MYSQL_HOST=db
+            - REDIS_HOST=redis
+        env_file:
+            - db.env
+        depends_on:
+            - db
+            - redis
+        networks:
+            - proxy-tier
+            - default
+    cron:
+        container_name: cron
+        image: nextcloud:apache
+        restart: always
+        volumes:
+            - nextcloud:/var/www/html
+        entrypoint: /cron.sh
+        depends_on:
+            - db
+            - redis
+    db:
+        container_name: db
+        image: mariadb:latest
+        command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+        restart: always
+        volumes:
+            - db:/var/lib/mysql
+        environment:
+            - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+        env_file:
+            - db.env
+    redis:
+        container_name: redis
+        image: redis:alpine
+        restart: always
+
+    letsencrypt:
+        container_name: letsencrypt
+        image: nginxproxy/acme-companion
+        restart: always
+        volumes:
+            - certs:/etc/nginx/certs
+            - acme:/etc/acme.sh
+            - vhost.d:/etc/nginx/vhost.d
+            - html:/usr/share/nginx/html
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        networks:
+            - proxy-tier
+depends_on:
+    - proxy
+volumes:
+    db:
+    nextcloud:
+    certs:
+    acme:
+    vhost.d:
+    html:
+
+networks:
+    proxy-tier:
